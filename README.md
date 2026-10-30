@@ -193,6 +193,14 @@ per request.
    so Dropbox token verdicts use a bounded cache that does.
 4. **`MALLOC_ARENA_MAX=2`** — set in both the Docker image and `installhelper.service`; glibc arena fragmentation otherwise ratchets RSS on multi-core Linux. If you run the binary outside those two paths, export `MALLOC_ARENA_MAX=2` yourself.
 
+### S3 publication links
+
+`POST /api/v1/shorten` additionally accepts `provider: "s3"` with `url` set to the complete install-page URL (`https://web.getappbox.com/?provider=s3&url=<encoded public HTTPS appinfo.json URL>`). The outer page must match `SHORTLINK_TARGET_BASE`; the inner metadata may use an AWS, Spaces or custom public domain. Unknown providers, duplicate parameters and credential-bearing/non-HTTPS sources are rejected before shortening. Requests still require the client token and the publisher's Dropbox bearer token. Omitting `provider` retains the existing Dropbox request and target behavior. The service does not fetch S3 metadata, manifests or IPAs; the install page and SDK download them anonymously from storage. Existing Dropbox proxy routes and rate limits are unchanged. Deploy matching readers before enabling S3 publishing.
+
+S3 responses additionally include `provider: "s3"`. Updated publishers require that confirmation before accepting a short URL, so an older service that ignores the request's provider cannot accidentally return a Dropbox target for an S3 link. Dropbox responses retain their existing shape.
+
+---
+
 ## Support
 
 If AppBox has been useful to you, consider supporting its continued development.

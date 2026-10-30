@@ -791,4 +791,77 @@ final class AppTests: XCTestCase {
 		let kept = await store.verdict(for: "d")
 		XCTAssertEqual(kept?.accountID, "d")
 	}
+
+    func testS3ShortenerGoldenTargetsAndLegacyTargets() throws {
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(StorageLinkFixtures.json.utf8)) as? [String: Any])
+        for link in try XCTUnwrap(fixture["links"] as? [[String: Any]]) {
+            let isS3 = link["provider"] as? String == "s3"
+            let request = ShortenRequest(url: link[isS3 ? "installURL" : "sharedURL"] as! String,
+                                         name: "Demo", version: "1.3", build: "7", identifier: "com.test.demo", provider: isS3 ? "s3" : nil)
+            XCTAssertEqual(try YOURLSService.targetURL(for: request, base: "https://web.getappbox.com"), link["shortenerTarget"] as? String)
+        }
+        XCTAssertEqual(try PublicInstallLink.validate("https://web2.test/app/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json", base: "https://web2.test/app/"),
+                       "https://web2.test/app/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json")
+    }
+
+    func testS3ShortenerRejectsInvalidAndExternalPageTargets() throws {
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(StorageLinkFixtures.json.utf8)) as? [String: Any])
+        let invalid = try XCTUnwrap(fixture["invalidInstallLinks"] as? [String])
+        for target in invalid + [
+            "https://evil.test/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+            "https://web.getappbox.com.evil.test/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+            "https://web.getappbox.com:8443/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+            "https://web.getappbox.com/other/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+            "https://web.getappbox.com/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json&extra=1"
+        ] {
+            XCTAssertThrowsError(try PublicInstallLink.validate(target, base: "https://web.getappbox.com"), target)
+        }
+        for provider in ["", "box", "webDAV"] {
+            let request = ShortenRequest(url: "https://www.dropbox.com/s/a/appinfo.json", name: "Demo", version: "1", build: "1", identifier: "com.test.demo", provider: provider)
+            XCTAssertThrowsError(try YOURLSService.targetURL(for: request, base: "https://web.getappbox.com")) { error in
+                XCTAssertEqual((error as? APIError)?.code, "invalid_provider")
+            }
+        }
+    }
+
+    func testS3ShorteningRetainsDropboxAuthorizationAndFallbackErrors() async throws {
+        let app = try await makeApp()
+        defer { app.shutdown() }
+        let body = ShortenRequest(url: "https://web.getappbox.com/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+                                   name: "Demo", version: "1.3", build: "7", identifier: "com.test.demo", provider: "s3")
+        app.shortLinkProvider = StubShortener(shortURL: "https://appbox.me/s3")
+        try app.test(.POST, "api/v1/shorten", headers: clientTokenHeaders, beforeRequest: { req in try req.content.encode(body) }, afterResponse: { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        })
+        app.dropboxTokenVerifier = StubVerifier(verdict: .rejected)
+        try app.test(.POST, "api/v1/shorten", headers: fullAuthHeaders, beforeRequest: { req in try req.content.encode(body) }, afterResponse: { res in
+            XCTAssertEqual(res.status, .unauthorized)
+        })
+        var verifiedHeaders = clientTokenHeaders
+        verifiedHeaders.bearerAuthorization = BearerAuthorization(token: "s3-publisher-dropbox-token")
+        app.dropboxTokenVerifier = StubVerifier(verdict: .verified(accountID: "dbid:publisher"))
+        try app.test(.POST, "api/v1/shorten", headers: verifiedHeaders, beforeRequest: { req in try req.content.encode(body) }, afterResponse: { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(try res.content.decode(ShortenResponse.self).shortURL, "https://appbox.me/s3")
+            XCTAssertEqual(try res.content.decode(ShortenResponse.self).provider, "s3")
+        })
+        app.shortLinkProvider = StubShortener(shortURL: nil)
+        try app.test(.POST, "api/v1/shorten", headers: verifiedHeaders, beforeRequest: { req in try req.content.encode(body) }, afterResponse: { res in
+            XCTAssertEqual(res.status, .badGateway)
+        })
+    }
+
+    func testS3ControllerRejectsInvalidTargetsBeforeShortener() async throws {
+        let app = try await makeApp()
+        defer { app.shutdown() }
+        app.dropboxTokenVerifier = StubVerifier(verdict: .verified(accountID: "dbid:publisher"))
+        app.shortLinkProvider = StubShortener(shortURL: "https://appbox.me/should-not-return")
+        let body = ShortenRequest(url: "https://evil.test/?provider=s3&url=https%3A%2F%2Fcdn.test%2Fappinfo.json",
+                                   name: "Demo", version: "1", build: "1", identifier: "com.test.demo", provider: "s3")
+        try app.test(.POST, "api/v1/shorten", headers: fullAuthHeaders, beforeRequest: { req in try req.content.encode(body) }, afterResponse: { res in
+            XCTAssertEqual(res.status, .badRequest)
+            XCTAssertEqual(try res.content.decode(APIErrorResponse.self).error.code, "invalid_url")
+        })
+    }
+
 }

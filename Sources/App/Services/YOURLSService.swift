@@ -45,7 +45,7 @@ struct YOURLSService: ShortLinkProviding {
 			throw APIError(status: .internalServerError, code: "misconfigured", message: "Shortener is not configured.")
 		}
 
-		let target = try Self.targetURL(forShareURL: request.url, base: Environment.shortlinkTargetBase)
+		let target = try Self.targetURL(for: request, base: Environment.shortlinkTargetBase)
 
 		let timestamp = String(Int(Date().timeIntervalSince1970))
 		let form = YOURLSForm(
@@ -96,6 +96,14 @@ struct YOURLSService: ShortLinkProviding {
 			return .success(shortURL)
 		}
 		return status == 400 ? .permanentFailure : .retryable
+	}
+
+	static func targetURL(for request: ShortenRequest, base: String) throws -> String {
+		switch request.provider {
+		case nil, "dropbox": return try targetURL(forShareURL: request.url, base: base)
+		case "s3": return try PublicInstallLink.validate(request.url, base: base)
+		default: throw APIError(status: .badRequest, code: "invalid_provider", message: "Unsupported storage provider.")
+		}
 	}
 
 	/// Builds the installer web-page URL wrapping the Dropbox share path.

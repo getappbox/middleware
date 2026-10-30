@@ -7,7 +7,7 @@
 
 import Vapor
 
-/// `POST /api/v1/shorten` — shorten a Dropbox share URL into an appbox.me install link.
+/// `POST /api/v1/shorten` — shorten a supported publication into an appbox.me install link.
 struct ShortLinkController: RouteCollection {
 	func boot(routes: Vapor.RoutesBuilder) throws {
 		routes.post("shorten", use: shorten(req:))
@@ -23,9 +23,10 @@ struct ShortLinkController: RouteCollection {
 		}
 
 		do {
+			_ = try YOURLSService.targetURL(for: body, base: Environment.shortlinkTargetBase)
 			let shortURL = try await req.application.shortLinkProvider.shorten(body, on: req)
 			let response = Response(status: .ok)
-			try response.content.encode(ShortenResponse(shortURL: shortURL))
+			try response.content.encode(ShortenResponse(shortURL: shortURL, provider: body.provider == "s3" ? "s3" : nil))
 			return response
 		} catch let apiError as APIError {
 			return APIErrorResponse.response(status: apiError.status, code: apiError.code, message: apiError.message)

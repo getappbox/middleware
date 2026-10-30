@@ -44,10 +44,21 @@ struct ShortenRequest: Content {
 	let version: String
 	let build: String
 	let identifier: String
+	let provider: String?
+
+	init(url: String, name: String, version: String, build: String, identifier: String, provider: String? = nil) {
+		self.url = url
+		self.name = name
+		self.version = version
+		self.build = build
+		self.identifier = identifier
+		self.provider = provider
+	}
 }
 
 struct ShortenResponse: Content {
 	let shortURL: String
+	var provider: String? = nil
 }
 
 // MARK: - POST /api/v1/mail/send
