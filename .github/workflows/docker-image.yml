@@ -1,107 +1,90 @@
-name: Build and Push Docker Image
+name: Test and Build Middleware
 
 on:
   push:
-    branches: [ main ]
-    tags: [ '*' ]
+    branches: [main]
+    tags: ['*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
-# A newer push on the same ref cancels an in-flight build (saves CI minutes).
-# Tags each get their own group, so release builds are never cancelled by each other.
 concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    name: Unit tests
-    runs-on: ubuntu-22.04
-    container: swift:6.1.3-jammy
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Cache SwiftPM build
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          path: .build
-          key: spm-${{ runner.os }}-swift6.1.3-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-swift6.1.3-
-
-      - name: Run unit tests
-        run: swift test
+          go-version: '1.27.3'
+          cache-dependency-path: go.sum
+      - name: Verify modules
+        run: go mod verify
+      - name: Vet
+        run: go vet ./...
+      - name: Unit and compatibility tests
+        run: go test -race -count=1 ./...
 
   build-and-push:
     needs: test
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Determine image tags
         id: meta
+        shell: bash
         run: |
-          REPO="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}"
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION_TAG="${GITHUB_REF#refs/tags/}"
-            TAGS="$REPO:$VERSION_TAG\n$REPO:latest"
-          else
-            DATE_TAG="$(date -u +'%Y%m%d-%H%M%S')"
-            # Optional: also include short SHA for traceability
-            SHORT_SHA="${GITHUB_SHA::7}"
-            TAGS="$REPO:$DATE_TAG\n$REPO:$SHORT_SHA\n$REPO:latest"
-          fi
-          echo "tags<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$TAGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      # Load the image into the local daemon first so the end-to-end suite can drive the real
-      # thing (routes, container entrypoint, health) before anything reaches the registry.
+          REPO="ghcr.io/${{ github.repository }}"
+          {
+            echo 'tags<<EOF'
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo "$REPO:${GITHUB_REF#refs/tags/}"
+            else
+              echo "$REPO:$(date -u +'%Y%m%d-%H%M%S')"
+              echo "$REPO:${GITHUB_SHA::7}"
+            fi
+            echo "$REPO:latest"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
       - name: Build image for testing
         uses: docker/build-push-action@v6
         with:
           context: .
           load: true
-          tags: install-helper:test
+          tags: middleware:test
           platforms: linux/amd64
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: End-to-end test the image
+      - name: Container smoke tests
         run: ./Scripts/test.sh e2e --no-build
-
-      - name: Build and push Docker image
+        env:
+          E2E_SKIP_ONLINE: '1'
+      - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           platforms: linux/amd64
-          # Single-arch build → skip the provenance attestation that otherwise
-          # shows up as an "unknown/unknown" entry in the GHCR package listing.
           provenance: false
-          # Link the published package back to this repo/commit.
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          # Persist the Swift build layers between runs. The release build uses
-          # -cross-module-optimization and is slow from scratch; this caches it.
           cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,275 @@
+[
+  {
+    "method": "GET",
+    "path": "/",
+    "requestHeaders": {},
+    "status": 200,
+    "body": "AppBox Install Service Helper",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8"
+    }
+  },
+  {
+    "method": "HEAD",
+    "path": "/",
+    "requestHeaders": {},
+    "status": 200,
+    "body": "",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/unknown",
+    "requestHeaders": {},
+    "status": 404,
+    "body": {
+      "error": true,
+      "reason": "Not Found"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/",
+    "requestHeaders": {},
+    "status": 404,
+    "body": {
+      "error": true,
+      "reason": "Not Found"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/config",
+    "requestHeaders": {},
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "invalid_client_token",
+        "message": "Missing or invalid client token."
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/config",
+    "requestHeaders": {
+      "X-AppBox-Client-Token": "bad"
+    },
+    "status": 401,
+    "body": {
+      "error": {
+        "message": "Missing or invalid client token.",
+        "code": "invalid_client_token"
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/config",
+    "requestHeaders": {
+      "X-AppBox-Client-Token": "test-client-token"
+    },
+    "status": 200,
+    "body": {
+      "dropboxAppKey": "test-app-key"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/latest-version",
+    "requestHeaders": {},
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "invalid_client_token",
+        "message": "Missing or invalid client token."
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/shorten",
+    "requestHeaders": {
+      "X-AppBox-Client-Token": "test-client-token"
+    },
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "missing_dropbox_token",
+        "message": "A Dropbox access token is required."
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/send",
+    "requestHeaders": {
+      "X-AppBox-Client-Token": "test-client-token"
+    },
+    "status": 401,
+    "body": {
+      "error": {
+        "message": "A Dropbox access token is required.",
+        "code": "missing_dropbox_token"
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notify",
+    "requestHeaders": {
+      "X-AppBox-Client-Token": "test-client-token"
+    },
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "missing_dropbox_token",
+        "message": "A Dropbox access token is required."
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/cors",
+    "requestHeaders": {},
+    "status": 400,
+    "body": {
+      "error": true,
+      "reason": "No value found (expected type 'String') at path 'url'. No String was found at 'url'."
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/cors?url=http://www.dropbox.com/a",
+    "requestHeaders": {},
+    "status": 403,
+    "body": {
+      "error": true,
+      "reason": "URL not allowed."
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/cors?url=https://evil.test/a",
+    "requestHeaders": {},
+    "status": 403,
+    "body": {
+      "reason": "URL not allowed.",
+      "error": true
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/install/notshare/manifest.plist",
+    "requestHeaders": {},
+    "status": 400,
+    "body": {
+      "error": true,
+      "reason": "Unsupported Dropbox path."
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/install/scl/../../etc/passwd",
+    "requestHeaders": {},
+    "status": 400,
+    "body": {
+      "reason": "Invalid path.",
+      "error": true
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/appinfo/scl/../../etc/passwd",
+    "requestHeaders": {},
+    "status": 400,
+    "body": {
+      "error": true,
+      "reason": "Invalid path."
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    }
+  },
+  {
+    "method": "OPTIONS",
+    "path": "/api/v1/config",
+    "requestHeaders": {
+      "Origin": "https://web.getappbox.com",
+      "Access-Control-Request-Method": "GET"
+    },
+    "status": 200,
+    "body": "",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "accept, authorization, content-type, origin, x-requested-with, user-agent, access-control-allow-origin",
+      "access-control-allow-methods": "GET, POST, PUT, OPTIONS, DELETE, PATCH",
+      "access-control-max-age": "600"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/config",
+    "requestHeaders": {
+      "Origin": "https://web.getappbox.com"
+    },
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "invalid_client_token",
+        "message": "Missing or invalid client token."
+      }
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "accept, authorization, content-type, origin, x-requested-with, user-agent, access-control-allow-origin",
+      "access-control-allow-methods": "GET, POST, PUT, OPTIONS, DELETE, PATCH",
+      "access-control-max-age": "600"
+    }
+  }
+]

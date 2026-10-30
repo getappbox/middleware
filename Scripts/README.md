@@ -1,38 +1,74 @@
+# Middleware checks
 
-## Testing
+Run `Scripts/test.sh` from the repository root. It runs the Go test suites, Docker smoke checks or both. Tests use disposable settings without mounting your `.env` file or sending real mail and notifications.
+
+
+## Usage
 
 ```bash
-./Scripts/test.sh
+./Scripts/test.sh [unit|e2e|all] [--no-build] [--keep]
 ```
 
-Unit tests, then end to end against a Docker image built from this working tree.
+Choose one mode and add flags as needed.
 
-| Command | What it runs |
+| Argument | Default | What it does |
+|---|---|---|
+| `unit` | No | Runs every Go suite with `go test -race -count=1 ./...`, including unit, compatibility, HTTP, executable, runner and privacy checks. Results are not reused from the test cache. |
+| `e2e` | No | Builds the Docker image, starts a test container and checks its health and HTTP responses. Optional live checks run only when their fixture variables are set. |
+| `all` | Yes | Runs `unit`, then `e2e`. A Go test failure stops the run before Docker starts. Omitting the mode selects `all`. |
+| `--no-build` | Off | Skips the Docker build and reuses the image selected by `E2E_IMAGE`. Fails if that image does not exist locally. Applies to `e2e` and `all`. |
+| `--keep` | Off | Leaves the test container running after the smoke checks, including when a check fails. Applies to `e2e` and `all`. |
+| `-h`, `--help` | Off | Prints usage and exits without running tests. |
+
+## Common commands
+
+| Command | Purpose |
 |---|---|
-| `./Scripts/test.sh` | both |
-| `./Scripts/test.sh unit` | `swift test` only |
-| `./Scripts/test.sh e2e` | build the image, start it, drive the routes over HTTP |
-| `./Scripts/test.sh e2e --no-build` | reuse the image already tagged `install-helper:test` |
-| `./Scripts/test.sh e2e --keep` | leave the container up afterwards for manual poking |
+| `./Scripts/test.sh unit` | Run all Go tests without Docker or live provider access. |
+| `./Scripts/test.sh` | Run all Go tests, then build and test the Docker image. |
+| `E2E_SKIP_ONLINE=1 ./Scripts/test.sh e2e` | Build the image and run container checks without the deleted-link checks. Leave both live-path variables unset for offline smoke checks. |
+| `E2E_SKIP_ONLINE=1 ./Scripts/test.sh e2e --no-build` | Test the existing local `middleware:test` image. |
+| `./Scripts/test.sh e2e --keep` | Keep the container available for inspection after testing. |
+| `GO_BIN=/opt/homebrew/bin/go ./Scripts/test.sh unit` | Select an existing Go compiler explicitly. |
+| `E2E_IMAGE=middleware:review E2E_PORT=8100 ./Scripts/test.sh e2e` | Build and test a custom image tag on host port `8100`. |
 
-The end-to-end run starts the real image with throwaway secrets — your `.env` is never mounted — on port `8099` (`E2E_PORT` to change it), and exits non-zero if anything fails.
+## Environment variables
 
-Most of its value needs the network. Dropbox answers a dead share link with `200` and an HTML notice page rather than an error status, so the fixtures are real share links whose state is fixed: a deleted build, and a bogus id that gets the "Invalid Link" page. Those checks are skipped, not failed, when Dropbox is unreachable. They also assert the thing that actually broke in production — that a proxied Dropbox page carries none of Dropbox's ~4 KB of headers, which overflow nginx's default 4 KB `proxy_buffer_size` and turn the whole reply into a `502`.
+Set variables before the command, as shown above. These are test-runner settings and do not need to be added to `.env`.
 
-A *working* share link cannot be minted without a real Dropbox upload, so the success cases only run when you point the script at a live build:
+| Variable | Default | Accepted value and behavior |
+|---|---|---|
+| `GO_BIN` | Auto-discovered | Executable path or command for Go. Used by `unit` and `all`, including child builds in executable tests. Quote paths containing spaces. |
+| `E2E_IMAGE` | `middleware:test` | Local Docker image tag to build or reuse with `--no-build`. |
+| `E2E_PORT` | `8099` | Available host TCP port mapped to container port `8080`. Requests use `http://127.0.0.1:<port>`. |
+| `E2E_SKIP_ONLINE` | Unset | Any nonempty value, including `0`, skips the deleted/invalid Dropbox link group. Use `1` to enable skipping. It does not disable the two live-path checks below. |
+| `E2E_DELETED_ID` | Unset | Share ID from an explicitly selected disposable deleted Dropbox link. Requires `E2E_DELETED_RLKEY` from the same link. |
+| `E2E_DELETED_RLKEY` | Unset | The `rlkey` value for that deleted link. The deleted/invalid group is skipped if either deleted-link variable is missing or Dropbox is unreachable. |
+| `E2E_INSTALL_PATH` | Unset | Request path beginning with `/install/` for a known live public manifest. Enables checks for the manifest status, XML, IPA download URL and content type. |
+| `E2E_APPINFO_PATH` | Unset | Request path beginning with `/appinfo/` for known live public metadata. Enables checks for status and valid JSON. Requires Python 3. |
+
+Live paths are relative to the local test server, rather than complete Dropbox URLs. For example, replace the placeholders below with an explicitly selected public test build. Keep real link identifiers out of committed files.
 
 ```bash
 E2E_INSTALL_PATH='/install/scl/fi/<id>/queryparam-rlkey-value-<key>/manifest.plist' \
-E2E_APPINFO_PATH='/appinfo/scl/fi/<id>/appinfo.json?rlkey=<key>' ./Scripts/test.sh e2e
+E2E_APPINFO_PATH='/appinfo/scl/fi/<id>/appinfo.json?rlkey=<key>' \
+./Scripts/test.sh e2e
 ```
 
-On macOS the unit tests build with Xcode's Swift rather than the 6.1.3 toolchain pinned in `.swift-version` for the Docker image, which will not build against a newer SDK. Override with `SWIFT_BIN` if needed.
+For offline smoke checks, unset all live fixture variables and reuse an already built image:
 
-### In CI
+```bash
+unset E2E_DELETED_ID E2E_DELETED_RLKEY E2E_INSTALL_PATH E2E_APPINFO_PATH
+E2E_SKIP_ONLINE=1 ./Scripts/test.sh e2e --no-build
+```
 
-`.github/workflows/docker-image.yml` runs the same two layers before anything is published:
+## Results and cleanup
 
-1. A `test` job runs `swift test` inside `swift:6.1.3-jammy` — the image the `Dockerfile` builds with, so CI compiles against the pinned toolchain rather than whatever is newest.
-2. `build-and-push` waits on it, builds the image into the runner's local daemon, drives `./Scripts/test.sh e2e --no-build` against that image, and only then pushes to GHCR. The push step re-uses the tested layers from cache, so the image that ships is the image that was tested.
+The summary reports passed, failed and skipped checks. A failed check or setup error exits with a nonzero status. Optional live checks report a skip when their fixtures are absent.
 
-A pull request runs both layers but skips the push. If the Dropbox-backed checks ever turn flaky on a runner, set `E2E_SKIP_ONLINE=1` on the end-to-end step — the rest of the suite still gates the push.
+Each Docker run replaces any existing container named `middleware-e2e`. The script removes the container and temporary response files when it exits, unless `--keep` retains the container. Inspect and remove a retained container with:
+
+```bash
+docker logs middleware-e2e
+docker rm -f middleware-e2e
+```
