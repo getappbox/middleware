@@ -10,3 +10,5 @@ This directory holds broader tests that exercise the public HTTP API and compile
 | `cmd/middleware/main_test.go` | Private argument/configuration/logging unit tests |
 
 Run everything with `go test -race -count=1 ./...`. Run just the separate suites with `go test -race ./tests/...`.
+
+The optional YOURLS plugin has separate PHP checks under `plugins/yourls/tests/`. These do not require PHP in the Go middleware or change `go test`. See the [plugin instructions](../plugins/yourls/README.md#tests) for modes and CI coverage.

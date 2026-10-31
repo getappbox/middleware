@@ -1,0 +1,51 @@
+# YOURLS uploader IP plugin
+
+This optional plugin lets YOURLS record the uploader's address forwarded by AppBox middleware 3.1.0 or later. Install it in YOURLS. The middleware remains a Go-only service and needs no PHP runtime.
+
+## Install
+
+1. Copy the `appbox-middleware-ip` directory into YOURLS's persistent `user/plugins/` directory. In the standard Docker image, the resulting file is `/var/www/html/user/plugins/appbox-middleware-ip/plugin.php`.
+2. Set `APPBOX_MIDDLEWARE_TRUSTED_IPS` in the **YOURLS container's environment** to the middleware container's exact addresses on their shared network. Recreate the YOURLS container after changing its environment, retaining its existing data volumes.
+3. Open **YOURLS admin → Manage Plugins** and activate **AppBox Middleware Client IP**.
+4. Create a short link for a new target URL and check its saved IP. Existing records keep their original IP, including when YOURLS returns an already-created short link.
+
+Example environment entry, using documentation-only addresses:
+
+```yaml
+environment:
+  APPBOX_MIDDLEWARE_TRUSTED_IPS: "192.0.2.10,2001:db8::10"
+```
+
+Replace both example addresses with the middleware addresses shown for the shared network in your deployment platform or `docker network inspect`. Keep the setting available to PHP. Do not use the uploader's address or the reverse proxy's address here.
+
+## Configuration
+
+| Setting | Where | Default | Accepted values |
+|---|---|---|---|
+| `APPBOX_MIDDLEWARE_TRUSTED_IPS` | YOURLS | Empty, trusts no forwarded addresses | Comma-separated exact IPv4 or IPv6 addresses of middleware peers. Whitespace is trimmed. CIDR ranges and hostnames are rejected. |
+| `TRUSTED_PROXY_CIDRS` | Middleware | Empty, retains count-based trust | IPs or CIDRs of the immediate reverse proxies connecting to middleware. This separate setting does not configure YOURLS. |
+| `TRUSTED_PROXY_COUNT` | Middleware | `1` | Number of trusted forwarded hops counted from the right. Use `0` for direct access. |
+
+Only API requests from configured middleware peers may supply a single valid `X-Forwarded-For` address. Missing or malformed values fall back to the peer address. Other IP headers are ignored. Public redirect and admin IP behavior stays unchanged.
+
+Keep middleware's existing YOURLS API URL and signature settings. No YOURLS core edit, database migration or signature rotation is needed. The plugin works with both the older and current YOURLS IP filters. Avoid combining it with another API IP-rewrite plugin without checking the resulting behavior.
+
+## Tests
+
+Run these commands from the middleware repository root with PHP 8.4 or later:
+
+```bash
+php plugins/yourls/tests/client_ip_test.php api
+php plugins/yourls/tests/client_ip_test.php web
+php plugins/yourls/tests/client_ip_test.php undefined
+```
+
+| Parameter | Default | Coverage |
+|---|---|---|
+| `api` | Yes | Trust configuration, IPv4/IPv6 normalization, untrusted peers, malformed and multiple addresses, missing headers and alternate-header isolation |
+| `web` | No | Preserve the original IP result for non-API requests |
+| `undefined` | No | Preserve the original IP result when the API constant is absent |
+
+The local tests use synthetic addresses and a minimal YOURLS hook stub. They need no database, credentials or network access. CI runs all three modes using a disposable PHP container. The private coordinated runner additionally checks the plugin against actual released and current YOURLS source.
+
+Reference: [YOURLS proxy documentation](https://yourls.org/docs/guide/advanced/proxy).
