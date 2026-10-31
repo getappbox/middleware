@@ -233,7 +233,7 @@ func run(args []string) error {
 	}
 	defer listener.Close()
 	done := make(chan error, 1)
-	go func() { done <- server.Serve(listener) }()
+	go func() { done <- serveHTTP(server, listener) }()
 	slog.Info("AppBox middleware listening", "network", network, "address", listener.Addr().String())
 	select {
 	case err := <-done:
@@ -246,6 +246,15 @@ func run(args []string) error {
 		defer cancel()
 		return server.Shutdown(shutdown)
 	}
+}
+
+func serveHTTP(server *http.Server, listener net.Listener) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = errors.New("HTTP listener failed unexpectedly")
+		}
+	}()
+	return server.Serve(listener)
 }
 
 func parseLogLevel(value string) (slog.Level, error) {

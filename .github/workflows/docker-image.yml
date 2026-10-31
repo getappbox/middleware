@@ -38,6 +38,17 @@ jobs:
               --volume "$PWD/plugins/yourls:/plugin:ro" --entrypoint php \
               "$IMAGE" /plugin/tests/client_ip_test.php "$mode"
           done
+          for scenario in duplicate registration collision getenv filter_var inet_pton inet_ntop logger; do
+            DISABLED=""
+            case "$scenario" in
+              getenv|filter_var|inet_pton|inet_ntop) DISABLED="$scenario" ;;
+              logger) DISABLED="getenv,error_log" ;;
+            esac
+            docker run --rm --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --user 65532:65532 \
+              --volume "$PWD/plugins/yourls:/plugin:ro" --entrypoint php \
+              "$IMAGE" -d "disable_functions=$DISABLED" /plugin/tests/recovery_test.php "$scenario"
+          done
 
   build-and-push:
     needs: test

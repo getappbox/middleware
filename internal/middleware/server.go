@@ -89,10 +89,7 @@ func writeError(w http.ResponseWriter, err error) {
 	}
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodHead {
-		w = headWriter{w}
-	}
+func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Origin") != "" {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "accept, authorization, content-type, origin, x-requested-with, user-agent, access-control-allow-origin")
@@ -187,8 +184,14 @@ func (s *Server) authenticate(r *http.Request) error {
 	return nil
 }
 
-func (s *Server) fetch(request *http.Request, maxBytes int64) (*http.Response, []byte, error) {
-	response, err := s.client.Do(request)
+func (s *Server) fetch(request *http.Request, maxBytes int64) (response *http.Response, body []byte, err error) {
+	defer func() {
+		if recover() != nil {
+			logRecoveredPanic("upstream")
+			response, body, err = nil, nil, legacyError{502, "Upstream request failed."}
+		}
+	}()
+	response, err = s.client.Do(request)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -197,7 +200,7 @@ func (s *Server) fetch(request *http.Request, maxBytes int64) (*http.Response, [
 	if response.ContentLength > maxBytes {
 		return nil, nil, legacyError{502, fmt.Sprintf("Upstream response exceeds the %d byte proxy limit.", maxBytes)}
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxBytes+1))
+	body, err = io.ReadAll(io.LimitReader(response.Body, maxBytes+1))
 	if err != nil {
 		return nil, nil, err
 	}

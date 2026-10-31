@@ -212,22 +212,11 @@ func (s *Server) latestResponse(w http.ResponseWriter, r *http.Request) error {
 	if err := r.Context().Err(); err != nil {
 		return err
 	}
-	s.updateMu.Lock()
-	if s.update != nil && s.updateExpires.After(s.now()) {
-		result := s.update
-		s.updateMu.Unlock()
+	result, flight := s.joinLatest(r.Context())
+	if result != nil {
 		writeJSON(w, 200, result)
 		return nil
 	}
-	flight := s.updateFlight
-	if flight == nil {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 40*time.Second)
-		flight = &latestFlight{done: make(chan struct{}), cancel: cancel}
-		s.updateFlight = flight
-		go s.refreshLatest(ctx, flight)
-	}
-	flight.waiters++
-	s.updateMu.Unlock()
 	select {
 	case <-r.Context().Done():
 		s.updateMu.Lock()
@@ -250,23 +239,51 @@ func (s *Server) latestResponse(w http.ResponseWriter, r *http.Request) error {
 	}
 }
 
+func (s *Server) joinLatest(ctx context.Context) (*latestVersion, *latestFlight) {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	if s.update != nil && s.updateExpires.After(s.now()) {
+		return s.update, nil
+	}
+	flight := s.updateFlight
+	if flight == nil {
+		workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 40*time.Second)
+		flight = &latestFlight{done: make(chan struct{}), cancel: cancel}
+		s.updateFlight = flight
+		go s.refreshLatest(workCtx, flight)
+	}
+	flight.waiters++
+	return nil, flight
+}
+
 func (s *Server) refreshLatest(ctx context.Context, flight *latestFlight) {
 	defer flight.cancel()
-	result, err := s.fetchLatest(ctx)
+	var result *latestVersion
+	var err error
+	var expires time.Time
+	defer func() {
+		if recover() != nil {
+			logRecoveredPanic("update refresh")
+			result, err = nil, apiError{502, "update_check_unavailable", "Could not reach the release feed."}
+		}
+		s.updateMu.Lock()
+		defer s.updateMu.Unlock()
+		flight.result, flight.err = result, err
+		if s.updateFlight == flight {
+			s.updateFlight = nil
+			if err == nil {
+				s.update, s.updateExpires = result, expires
+			}
+		}
+		close(flight.done)
+	}()
+	result, err = s.fetchLatest(ctx)
 	if ctx.Err() != nil {
 		result, err = nil, apiError{502, "update_check_unavailable", "Could not reach the release feed."}
 	}
-	s.updateMu.Lock()
-	defer s.updateMu.Unlock()
-	flight.result, flight.err = result, err
-	if s.updateFlight == flight {
-		s.updateFlight = nil
-		if err == nil {
-			s.update = result
-			s.updateExpires = s.now().Add(s.config.UpdateCacheTTL)
-		}
+	if err == nil {
+		expires = s.now().Add(s.config.UpdateCacheTTL)
 	}
-	close(flight.done)
 }
 
 func (s *Server) fetchLatest(ctx context.Context) (*latestVersion, error) {
@@ -286,21 +303,33 @@ func (s *Server) fetchLatest(ctx context.Context) (*latestVersion, error) {
 		return err == nil && response.StatusCode == 200 && json.Unmarshal(body, target) == nil
 	}
 	go func() {
+		var outcome *release
+		defer func() {
+			if recover() != nil {
+				logRecoveredPanic("release feed")
+				outcome = nil
+			}
+			github <- outcome
+		}()
 		var result release
 		if get(s.config.GitHubLatestReleaseURL, &result) && result.Tag != nil && result.URL != nil {
-			github <- &result
-		} else {
-			github <- nil
+			outcome = &result
 		}
 	}()
 	go func() {
+		var outcome *string
+		defer func() {
+			if recover() != nil {
+				logRecoveredPanic("homebrew feed")
+				outcome = nil
+			}
+			brew <- outcome
+		}()
 		var result struct {
 			Version *string `json:"version"`
 		}
 		if get(s.config.HomebrewCaskURL, &result) {
-			brew <- result.Version
-		} else {
-			brew <- nil
+			outcome = result.Version
 		}
 	}()
 	result, homebrew := <-github, <-brew
