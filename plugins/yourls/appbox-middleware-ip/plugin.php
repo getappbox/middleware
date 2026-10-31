@@ -1,8 +1,11 @@
 <?php
 /*
 Plugin Name: AppBox Middleware Client IP
+Plugin URI: https://github.com/getappbox/middleware/tree/main/plugins/yourls
 Description: Accept one uploader IP from configured AppBox middleware peers for API calls.
 Version: 1.1.0
+Author: Vineet Choudhary
+Author URI: https://github.com/vineetchoudhary
 */
 
 if (!defined('YOURLS_ABSPATH')) {
