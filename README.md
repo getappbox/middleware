@@ -19,7 +19,7 @@ The AppBox middleware
 
 ## Quick start
 
-Every method needs a `.env` file first:
+Docker Compose uses the variables listed in its `environment` block. Set them in your shell or deployment environment. The Docker run and native examples below use a `.env` file:
 
 ```bash
 cp .env.example .env

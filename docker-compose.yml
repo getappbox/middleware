@@ -3,11 +3,26 @@ services:
     image: middleware:latest
     build:
       context: .
-    env_file:
-      - .env
     environment:
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: "${PORT:-8080}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      APPBOX_CLIENT_TOKEN: "${APPBOX_CLIENT_TOKEN-}"
+      DROPBOX_APP_KEY: "${DROPBOX_APP_KEY-}"
+      DROPBOX_TOKEN_CACHE_TTL_SECONDS: "${DROPBOX_TOKEN_CACHE_TTL_SECONDS-600}"
+      MAILGUN_API_KEY: "${MAILGUN_API_KEY-}"
+      MAILGUN_DOMAIN: "${MAILGUN_DOMAIN-mail.example.com}"
+      MAILGUN_FROM: "${MAILGUN_FROM-AppBox Build <build@example.com>}"
+      YOURLS_API_URL: "${YOURLS_API_URL-https://link.example.com/yourls-api.php}"
+      YOURLS_SIGNATURE_SECRET: "${YOURLS_SIGNATURE_SECRET-}"
+      SHORTLINK_TARGET_BASE: "${SHORTLINK_TARGET_BASE-https://web.example.com}"
+      CORS_PROXY_ALLOWED_HOSTS: "${CORS_PROXY_ALLOWED_HOSTS-dropbox.com,dropboxusercontent.com,example.com}"
+      PROXY_MAX_BODY_BYTES: "${PROXY_MAX_BODY_BYTES-4194304}"
+      GITHUB_LATEST_RELEASE_URL: "${GITHUB_LATEST_RELEASE_URL-https://api.github.com/repos/getappbox/AppBox-iOSAppsWirelessInstallation/releases/latest}"
+      HOMEBREW_CASK_URL: "${HOMEBREW_CASK_URL-https://formulae.brew.sh/api/cask/appbox.json}"
+      UPDATE_CACHE_TTL_SECONDS: "${UPDATE_CACHE_TTL_SECONDS-3600}"
+      NOTIFY_ALLOWED_HOSTS: "${NOTIFY_ALLOWED_HOSTS-hooks.slack.com,office.com,office365.com,logic.azure.com,powerplatform.com}"
+      TRUSTED_PROXY_COUNT: "${TRUSTED_PROXY_COUNT-1}"
     ports:
-      - '2551:8080'
+      - "2551:${PORT:-8080}"
     restart: unless-stopped
     stop_grace_period: 20s
