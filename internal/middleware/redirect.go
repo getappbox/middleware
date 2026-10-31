@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 )
 
 type redirectHostsKey struct{}
@@ -26,6 +27,9 @@ func checkRedirect(request *http.Request, via []*http.Request) error {
 	}
 	if hosts, scoped := request.Context().Value(redirectHostsKey{}).([]string); scoped && !allowedHost(request.URL.Hostname(), hosts) {
 		return errors.New("redirect host is not allowed")
+	}
+	if len(via) > 0 && !strings.EqualFold(request.URL.Host, via[0].URL.Host) {
+		request.Header.Del("X-Forwarded-For")
 	}
 	return nil
 }

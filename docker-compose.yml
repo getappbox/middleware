@@ -20,6 +20,7 @@ services:
       UPDATE_CACHE_TTL_SECONDS: "${UPDATE_CACHE_TTL_SECONDS-3600}"
       NOTIFY_ALLOWED_HOSTS: "${NOTIFY_ALLOWED_HOSTS-hooks.slack.com,office.com,office365.com,logic.azure.com,powerplatform.com}"
       TRUSTED_PROXY_COUNT: "${TRUSTED_PROXY_COUNT-1}"
+      TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS-}"
     ports:
       - "2551:${PORT:-8080}"
     restart: unless-stopped

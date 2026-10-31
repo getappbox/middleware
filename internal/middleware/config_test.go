@@ -9,7 +9,7 @@ import (
 )
 
 func TestEnvironmentConfiguration(t *testing.T) {
-	for _, key := range []string{"PORT", "APPBOX_CLIENT_TOKEN", "DROPBOX_APP_KEY", "MAILGUN_API_KEY", "YOURLS_SIGNATURE_SECRET", "MAILGUN_DOMAIN", "MAILGUN_FROM", "YOURLS_API_URL", "SHORTLINK_TARGET_BASE", "CORS_PROXY_ALLOWED_HOSTS", "GITHUB_LATEST_RELEASE_URL", "HOMEBREW_CASK_URL", "NOTIFY_ALLOWED_HOSTS", "PROXY_MAX_BODY_BYTES", "UPDATE_CACHE_TTL_SECONDS", "DROPBOX_TOKEN_CACHE_TTL_SECONDS", "TRUSTED_PROXY_COUNT"} {
+	for _, key := range []string{"PORT", "APPBOX_CLIENT_TOKEN", "DROPBOX_APP_KEY", "MAILGUN_API_KEY", "YOURLS_SIGNATURE_SECRET", "MAILGUN_DOMAIN", "MAILGUN_FROM", "YOURLS_API_URL", "SHORTLINK_TARGET_BASE", "CORS_PROXY_ALLOWED_HOSTS", "GITHUB_LATEST_RELEASE_URL", "HOMEBREW_CASK_URL", "NOTIFY_ALLOWED_HOSTS", "PROXY_MAX_BODY_BYTES", "UPDATE_CACHE_TTL_SECONDS", "DROPBOX_TOKEN_CACHE_TTL_SECONDS", "TRUSTED_PROXY_COUNT", "TRUSTED_PROXY_CIDRS"} {
 		value, existed := os.LookupEnv(key)
 		t.Setenv(key, "")
 		if err := os.Unsetenv(key); err != nil {
@@ -24,7 +24,7 @@ func TestEnvironmentConfiguration(t *testing.T) {
 		})
 	}
 	c := ConfigFromEnvironment()
-	if c.Port != "8080" || c.ProxyMaxBodyBytes != 4194304 || c.DropboxTokenCacheTTL != 600*time.Second || c.UpdateCacheTTL != time.Hour || c.TrustedProxyCount != 1 || len(c.MissingAPIConfiguration()) != 4 {
+	if c.Port != "8080" || c.ProxyMaxBodyBytes != 4194304 || c.DropboxTokenCacheTTL != 600*time.Second || c.UpdateCacheTTL != time.Hour || c.TrustedProxyCount != 1 || len(c.TrustedProxyCIDRs) != 0 || len(c.MissingAPIConfiguration()) != 4 {
 		t.Fatal(c)
 	}
 	if c.MailgunDomain != "mail.getappbox.com" || c.ShortlinkTargetBase != "https://web.getappbox.com" || c.YOURLSAPIURL != "https://appbox.me/yourls-api.php" {

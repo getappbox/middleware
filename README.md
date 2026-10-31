@@ -133,7 +133,7 @@ All configuration is environment variables, loaded from `.env.<environment>` and
 | `GITHUB_LATEST_RELEASE_URL` / `HOMEBREW_CASK_URL` | Update-check upstreams | - |
 | `UPDATE_CACHE_TTL_SECONDS` | Update-check cache lifetime | `3600` |
 | `NOTIFY_ALLOWED_HOSTS` | Host suffixes `/api/v1/notify` may POST to | Slack + Teams hosts |
-| `TRUSTED_PROXY_COUNT` | Reverse proxies appending to `X-Forwarded-For` | `1` |
+| `TRUSTED_PROXY_COUNT` / `TRUSTED_PROXY_CIDRS` | Right-side forwarded-IP hops for rate limits and YOURLS, with an optional immediate-proxy IP/CIDR allowlist | `1` / empty |
 
 A missing `/api/v1` secret is logged by name at boot but is **not** fatal. The install/appinfo/cors routes keep serving, and the affected `/api/v1` endpoints return errors per request.
 

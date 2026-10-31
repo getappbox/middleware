@@ -162,7 +162,7 @@ type headWriter struct{ http.ResponseWriter }
 func (w headWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func (s *Server) rateLimit(w http.ResponseWriter, r *http.Request, bucket string, limit int) bool {
-	if retry := s.rates.register(bucket+":"+clientIP(r, s.config.TrustedProxyCount), limit, s.now()); retry > 0 {
+	if retry := s.rates.register(bucket+":"+clientIP(r, s.config.TrustedProxyCount, s.config.TrustedProxyCIDRs...), limit, s.now()); retry > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(retry))
 		writeError(w, apiError{429, "rate_limited", "Too many requests. Try again later."})
 		return true

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -40,6 +41,7 @@ func (s *Server) shorten(w http.ResponseWriter, r *http.Request) error {
 		"timestamp": {timestamp}, "signature": {sha512Hex(timestamp + s.config.YOURLSSignatureSecret)},
 		"title": {fmt.Sprintf("%s, %s, %s, %s", body.Name, body.Identifier, body.Version, body.Build)},
 	}
+	clientAddress, clientAddressErr := netip.ParseAddr(clientIP(r, s.config.TrustedProxyCount, s.config.TrustedProxyCIDRs...))
 	lastFailure := "Shortener unavailable."
 	for attempt := 1; attempt <= 3; attempt++ {
 		if r.Context().Err() != nil {
@@ -50,6 +52,9 @@ func (s *Server) shorten(w http.ResponseWriter, r *http.Request) error {
 			return apiError{502, "shortener_unavailable", "Shortener request failed."}
 		}
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if clientAddressErr == nil && clientAddress.Zone() == "" {
+			request.Header.Set("X-Forwarded-For", clientAddress.Unmap().String())
+		}
 		response, data, err := s.fetch(request, 4*1024*1024)
 		if err != nil {
 			lastFailure = "Shortener request failed."

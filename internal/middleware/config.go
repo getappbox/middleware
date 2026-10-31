@@ -26,6 +26,7 @@ type Config struct {
 	UpdateCacheTTL         time.Duration
 	NotifyAllowedHosts     []string
 	TrustedProxyCount      int
+	TrustedProxyCIDRs      []string
 }
 
 func ConfigFromEnvironment() Config {
@@ -50,6 +51,12 @@ func ConfigFromEnvironment() Config {
 		}
 		return result
 	}
+	var trustedProxyCIDRs []string
+	if raw := os.Getenv("TRUSTED_PROXY_CIDRS"); raw != "" {
+		for entry := range strings.SplitSeq(raw, ",") {
+			trustedProxyCIDRs = append(trustedProxyCIDRs, strings.TrimSpace(entry))
+		}
+	}
 	return Config{
 		Port:                   strconv.Itoa(integer("PORT", 8080)),
 		ClientToken:            os.Getenv("APPBOX_CLIENT_TOKEN"),
@@ -68,6 +75,7 @@ func ConfigFromEnvironment() Config {
 		UpdateCacheTTL:         time.Duration(integer("UPDATE_CACHE_TTL_SECONDS", 3600)) * time.Second,
 		NotifyAllowedHosts:     hosts("NOTIFY_ALLOWED_HOSTS", "hooks.slack.com,office.com,office365.com,logic.azure.com,powerplatform.com"),
 		TrustedProxyCount:      max(0, integer("TRUSTED_PROXY_COUNT", 1)),
+		TrustedProxyCIDRs:      trustedProxyCIDRs,
 	}
 }
 
