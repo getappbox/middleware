@@ -30,7 +30,7 @@ Fill in the values (see [Configuration](#configuration)).
 ### Option 1: Docker Compose
 
 ```bash
-docker compose build
+docker compose pull app
 ```
 
 ```bash
@@ -83,16 +83,16 @@ sudo systemctl daemon-reload && sudo systemctl enable --now middleware
 
 ### Updating
 
-**Docker Compose** (builds locally, so rebuild rather than pull):
+**Docker Compose** (pulls the published GHCR image):
 
 ```bash
-git pull && docker compose build && docker compose up -d app
+git pull && docker compose pull app && docker compose up -d app
 ```
 
 **Prebuilt GHCR image:**
 
 ```bash
-docker pull ghcr.io/getappbox/middleware:latest && docker tag ghcr.io/getappbox/middleware:latest middleware:latest && docker compose up -d --no-build app
+docker pull ghcr.io/getappbox/middleware:latest && docker compose up -d app
 ```
 
 **Native** (do not run as root):

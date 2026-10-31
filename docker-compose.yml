@@ -1,8 +1,6 @@
 services:
   app:
-    image: middleware:latest
-    build:
-      context: .
+    image: ghcr.io/getappbox/middleware:latest
     environment:
       PORT: "${PORT:-8080}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
